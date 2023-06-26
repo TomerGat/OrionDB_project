@@ -1,5 +1,5 @@
 import random
-from PyOrion.final_values import MAX_NUMBER_TO_GENERATE
+from final_values import MAX_NUMBER_TO_GENERATE
 import datetime
 
 
@@ -33,11 +33,9 @@ def dict_to_str(data):  # not using json dumps/loads because json function conve
                     items.append(f'{key_str}:{{{_dict_to_string_helper(value)}}}')
                 elif isinstance(value, str):
                     items.append(f'{key_str}:"{value}"')
-                elif isinstance(value, bool):
-                    items.append(f'{key_str}:[{value}]')
                 elif value is None:
-                    items.append(f'{key_str}:"None"')
-                elif isinstance(value, (int, float)):
+                    items.append(f'{key_str}:"."')
+                elif isinstance(value, (int, float, bool)):
                     items.append(f'{key_str}:{value}')
                 else:
                     raise ValueError(f"Unsupported value type for key '{key}'")
@@ -98,17 +96,19 @@ def str_to_dict(data):  # redo recursively
 def resolve_data_types(data):
     def _resolve_type_helper(var):
         if var[0] == '"':
+            if var == '"."':
+                return None
             new = var[1:-1]
-        elif var[0] == '[':
-            new = var[1:-1]
-            if new == 'True':
-                return True
-            return False
         else:
-            if '.' in var:
-                new = float(var)
+            if var[0] == 'T':
+                return True
+            elif var[0] == 'F':
+                return False
             else:
-                new = int(var)
+                if '.' in var:
+                    new = float(var)
+                else:
+                    new = int(var)
         return new
 
     if isinstance(data, dict):
@@ -209,3 +209,23 @@ def selection_sort(numbers):
 
     # recursively sort the remaining part of the array
     return [numbers[0]] + selection_sort(numbers[1:])
+
+
+def format_for_xml(string):
+    new_string = 'OPENER'.join(string.split('{'))
+    final_string = 'CLOSER'.join(new_string.split('}'))
+    last = 'KEYTOVALUE'.join(final_string.split(':'))
+    valid = 'QOUTE'.join(last.split('"'))
+    final_valid = 'COMMA'.join(valid.split(','))
+    to_return = 'DOT'.join('UNDER'.join(final_valid.split('_')).split('.'))
+    return to_return
+
+
+def format_from_xml(string):
+    new_string = '{'.join(string.split('OPENER'))
+    final_string = '}'.join(new_string.split('CLOSER'))
+    last = ':'.join(final_string.split('KEYTOVALUE'))
+    valid = '"'.join(last.split('QOUTE'))
+    final_valid = ','.join(valid.split('COMMA'))
+    to_return = '.'.join('_'.join(final_valid.split('UNDER')).split('DOT'))
+    return to_return

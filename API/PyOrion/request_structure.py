@@ -1,4 +1,4 @@
-from PyOrion.util_functions import str_to_dict, dict_to_str
+from util_functions import str_to_dict, dict_to_str
 
 """
 client to server request types:

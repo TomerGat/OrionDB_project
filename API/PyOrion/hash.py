@@ -1,6 +1,6 @@
 import math
 import hashlib
-from PyOrion.final_values import HASH_LENGTH_LIMIT
+from final_values import HASH_LENGTH_LIMIT
 
 
 def digit_count(num: int) -> int:

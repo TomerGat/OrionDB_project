@@ -1,6 +1,6 @@
-from PyOrion.util_functions import get_precise_time, get_numeral_date_representation
-from PyOrion.final_values import DEFAULT_TIMEFRAME_FOR_CONNECTIONS_SCAN
-from PyOrion.data_structures import Pipeline
+from util_functions import get_precise_time, get_numeral_date_representation
+from final_values import DEFAULT_TIMEFRAME_FOR_CONNECTIONS_SCAN
+from data_structures import Pipeline
 
 
 class Timestamp:

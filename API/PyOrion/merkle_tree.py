@@ -1,4 +1,4 @@
-from PyOrion.hash import hash_function
+from hash import hash_function
 
 
 class TreeNode:

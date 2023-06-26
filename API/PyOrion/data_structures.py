@@ -1,4 +1,4 @@
-from PyOrion.networks_functions import calculate_ttl
+from networks_functions import calculate_ttl
 
 
 class QueryTypes:  # different types of database queries

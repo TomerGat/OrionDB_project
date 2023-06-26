@@ -1,4 +1,4 @@
-from PyOrion.data_storage_implementation.collection import Collection
+from collection import Collection
 
 
 class DB:

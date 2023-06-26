@@ -1,7 +1,7 @@
 import socket
-from PyOrion.encryption import encrypt, decrypt, generate_encryption_key
-from PyOrion.hash import hash_function
-from PyOrion.final_values import HASH_LENGTH_LIMIT, MAXIMUM_PACKET_SIZE
+from encryption import encrypt, decrypt, generate_encryption_key
+from hash import hash_function
+from final_values import HASH_LENGTH_LIMIT, MAXIMUM_PACKET_SIZE
 
 
 class EncryptedSocket(socket.socket):

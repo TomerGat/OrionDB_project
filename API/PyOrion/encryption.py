@@ -1,8 +1,8 @@
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import base64
-from PyOrion.hash import sha_function
-from PyOrion.util_functions import generate_random_number
+from hash import sha_function
+from util_functions import generate_random_number
 
 
 def generate_encryption_key() -> str:

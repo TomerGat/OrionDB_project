@@ -1,4 +1,4 @@
-from PyOrion.util_functions import dict_to_str
+from util_functions import dict_to_str
 
 
 class Item:

@@ -1,8 +1,8 @@
-from PyOrion.encrypted_socket import EncryptedSocket
-from PyOrion.final_values import MAIN_SERVER_ADDRESS
-from PyOrion.data_structures import NetworkMemberTypes, PacketTypes
-from PyOrion.hash import sha_function
-from PyOrion.request_structure import Packet
+from encrypted_socket import EncryptedSocket
+from final_values import MAIN_SERVER_ADDRESS
+from data_structures import NetworkMemberTypes, PacketTypes
+from hash import sha_function
+from request_structure import Packet
 
 
 def initial_server_connect():

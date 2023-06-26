@@ -1,7 +1,7 @@
-from PyOrion.hash import sha_function
-from PyOrion.util_functions import generate_random_number, dict_to_str, validate_string
-from PyOrion.data_storage_implementation.item import Item
-from PyOrion.merkle_tree import MerkleTree
+from hash import sha_function
+from util_functions import generate_random_number, dict_to_str, validate_string
+from item import Item
+from merkle_tree import MerkleTree
 
 
 class Collection:

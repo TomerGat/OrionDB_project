@@ -1,12 +1,12 @@
-from PyOrion.encrypted_socket import EncryptedSocket
-from PyOrion.final_values import MAIN_SERVER_ADDRESS, NODE_COMMUNICATION_PORT, STORAGE_COPIES
-from PyOrion.request_structure import Packet
-from PyOrion.hash import sha_function
-from PyOrion.data_structures import NetworkMemberTypes, PacketTypes
-from PyOrion.data_storage_implementation.database import DB
+from encrypted_socket import EncryptedSocket
+from final_values import MAIN_SERVER_ADDRESS, NODE_COMMUNICATION_PORT, STORAGE_COPIES
+from request_structure import Packet
+from hash import sha_function
+from data_structures import NetworkMemberTypes, PacketTypes
+from database import DB
 import os
-from PyOrion.networks_functions import calculate_ttl
-from PyOrion.util_functions import get_key_for_highest_value
+from networks_functions import calculate_ttl
+from util_functions import get_key_for_highest_value
 import socket
 
 
