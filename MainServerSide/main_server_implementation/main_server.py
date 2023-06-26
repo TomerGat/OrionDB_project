@@ -31,7 +31,7 @@ class OrionMainServer:
     connection_logs = {}  # {client address: connection log}
     flag = {}  # {client address: run/stop server flag}
     connected_sockets = []  # list of currently connected sockets
-    node_session_tokens = {}  # {node address: session token}
+    node_session_tokens = {}  # {node ip address: session token}
     approval_codes = set()  # set of approval codes
     node_packet_queue = {}  # {node id: list of packets that could not be sent because node was offline}
 
@@ -95,8 +95,6 @@ class OrionMainServer:
         # receive initial identification packet with credentials
         packet_encoded = client_socket.recv()
         packet = Packet(request_encoded=packet_encoded)
-        credentials = packet.data[
-            'credentials']  # credentials - username, password if creating account / connection string if connecting to account/node
         account = None
         account_id = None
         node_id = None
@@ -150,6 +148,9 @@ class OrionMainServer:
             print('Connection from {} closed'.format(client_address))
             return
 
+        credentials = packet.data[
+            'credentials']  # credentials - username, password if creating account / connection string if connecting to account/node
+
         # check if packet is a new account/node
         if packet.request_type == PacketTypes.OPEN_ACCOUNT or packet.request_type == PacketTypes.NEW_NODE_CONNECTION:
             confirm = True
@@ -175,8 +176,8 @@ class OrionMainServer:
             # disconnect client and remove session token
             MainDataDirectory().remove_session_token(true_token)
             del self.flag[client_address]
-            if client_address in self.node_session_tokens:
-                del self.node_session_tokens[client_address]
+            # if client_address[0] in self.node_session_tokens:
+            #     del self.node_session_tokens[client_address[0]]
             self.connected_sockets.remove(client_socket)
             client_socket.close()
             print('\nConnection from {} closed'.format(client_address))
@@ -200,10 +201,7 @@ class OrionMainServer:
                             account_id = MainDataDirectory().account_credentials[credentials]
                             account = MainDataDirectory().accounts[account_id][0]
                             # get all databases owned by account
-                            databases_owned = account.databases_owned
-                            account_dbs = {}  # {db name: db id}
-                            for db_name in databases_owned:
-                                account_dbs[db_name] = databases_owned[db_name][0]
+                            account_dbs = account.databases_owned  # {db name: db id}
                     except KeyError:
                         confirm = False
                         print('Incorrect credentials for connection from address: {}'.format(client_address))
@@ -223,13 +221,15 @@ class OrionMainServer:
                             if not confirm:
                                 confirm = False
                             else:
-                                self.node_session_tokens[client_address] = true_token
+                                self.node_session_tokens[client_address[0]] = true_token
                                 node_id = MainDataDirectory().node_addresses[client_address[0]]
+                                MainDataDirectory().nodes[node_id] = (MainDataDirectory().nodes[node_id][0], client_socket)
+                                MainDataDirectory().active_nodes.append(node_id)
                     except KeyError:
                         confirm = False
                         print('Incorrect credentials for connection from address: {}'.format(client_address))
                     except Exception as e:
-                        print(f'Exception {e} while verifying node account')
+                        print(f'Exception "{e}" while verifying node account')
                         confirm = False
                 else:
                     raise Exception('System Error')
@@ -247,6 +247,8 @@ class OrionMainServer:
         while self.run and self.flag[client_address]:
             try:
                 packet_encoded = client_socket.recv()
+                if len(packet_encoded.decode()) == 0:
+                    continue
                 packet = Packet(request_encoded=packet_encoded)
                 received_token = packet.token
                 if received_token == true_token:
@@ -264,8 +266,8 @@ class OrionMainServer:
         # disconnect client and remove session token
         MainDataDirectory().remove_session_token(true_token)
         del self.flag[client_address]
-        if client_address in self.node_session_tokens:
-            del self.node_session_tokens[client_address]
+        # if client_address in self.node_session_tokens[0]:
+        #     del self.node_session_tokens[client_address[0]]
         self.connected_sockets.remove(client_socket)
 
         if answer:  # if answer if False, verification answer was already disconnect notice
@@ -330,6 +332,7 @@ class OrionMainServer:
             pipeline_entry = self.pipeline.pop()
             packet = pipeline_entry['packet']
             request_type = packet.request_type
+            print(f'type: {request_type}, entry: {pipeline_entry}')
             # continue with handling according to type of packet
             if request_type == PacketTypes.CLIENT_REQUESTING_DISCONNECT or request_type == PacketTypes.NODE_REQUESTING_DISCONNECT:
                 self.handle_disconnect(pipeline_entry['socket'], pipeline_entry['address'], pipeline_entry['token'])
@@ -337,9 +340,10 @@ class OrionMainServer:
 
             elif request_type == PacketTypes.DATA_DOWNLOAD_REQUEST:
                 # check that db name/id is valid and owned by accessed account
-                if (pipeline_entry['packet'].data['db name'] not in pipeline_entry['account'].databases_owned.keys()) or \
-                        (pipeline_entry['packet'].data['db id'] !=
-                         pipeline_entry['account'].databases_owned[pipeline_entry['packet'].data['db name']][0]):
+                condition1 = pipeline_entry['packet'].data['db name'] not in pipeline_entry['account'].databases_owned.keys()  # check that db name is owned by account
+                # also check that received db id is valid
+                condition2 = pipeline_entry['packet'].data['db id'] != pipeline_entry['account'].databases_owned[pipeline_entry['packet'].data['db name']]
+                if condition1 or condition2:
                     self.handle_disconnect(pipeline_entry['socket'], pipeline_entry['address'], pipeline_entry['token'],
                                            disconnect_completely=False)
                     continue
@@ -366,7 +370,7 @@ class OrionMainServer:
                 continue
 
             elif request_type == PacketTypes.REQUEST_LOWERING_MEMORY_SPACE:
-                if pipeline_entry['packet'].token == self.node_session_tokens[pipeline_entry['address']]:
+                if pipeline_entry['packet'].token == self.node_session_tokens[pipeline_entry['address'][0]]:
                     memory_to_free = pipeline_entry['packet'].data['memory to free']
                     MainDataDirectory().nodes[0].total_storage -= memory_to_free
                 continue
@@ -392,13 +396,13 @@ class OrionMainServer:
 
         # send source list and other data to client
         packet = Packet(request_type=PacketTypes.BE_READY_FOR_DATA, sender_type=NetworkMemberTypes.MAIN_SERVER,
-                        data={'whitelist': nodes_data, 'item count': MainDataDirectory().count_db_items(db_id)},
+                        data={'whitelist': source, 'item count': MainDataDirectory().count_db_items(db_id)},
                         token=token)
         client_socket.send(packet.encode())
 
         # send instructions to source nodes
         for node_id in source.values():
-            node_token = self.node_session_tokens[MainDataDirectory().nodes[node_id][0].address]
+            node_token = self.node_session_tokens[MainDataDirectory().nodes[node_id][0].address[0]]
             packet = Packet(request_type=PacketTypes.SEND_DATA_FROM_STORAGE, sender_type=NetworkMemberTypes.MAIN_SERVER,
                             data={'target': client_address[0], 'db id': db_id}, token=node_token)
             node_socket = MainDataDirectory().nodes[node_id][1]
@@ -432,7 +436,7 @@ class OrionMainServer:
             node_socket = MainDataDirectory().nodes[node_id][1]
             node_socket.send(packet.encode())
 
-        # receive confirmation from client (second round -> answer not relevant
+        # receive confirmation from client (second round -> answer not relevant)
         _ = Packet(request_encoded=client_socket.recv())
         return
 
@@ -461,7 +465,7 @@ class OrionMainServer:
 
         # send be-ready notification to target node
         packet = Packet(request_type=PacketTypes.BE_READY_FOR_DATA, sender_type=NetworkMemberTypes.MAIN_SERVER,
-                        data={'source node ip': source_node_address[0]}, token=self.node_session_tokens[target_node_id])
+                        data={'source node ip': source_node_address[0]}, token=self.node_session_tokens[MainDataDirectory().nodes[target_node_id][0]].address[0])
         node_socket = MainDataDirectory().nodes[target_node_id][1]
         node_socket.send(packet.encode())
 
@@ -503,7 +507,7 @@ class OrionMainServer:
         account_id = MainDataDirectory().account_credentials[credentials]
 
         # recheck token
-        if packet.token != self.node_session_tokens[node_id]:
+        if packet.token != self.node_session_tokens[node_address[0]]:
             return
 
         # verify credentials
@@ -543,7 +547,7 @@ class OrionMainServer:
             try:
                 sent_packet = Packet(request_type=PacketTypes.DELETE_DB, sender_type=NetworkMemberTypes.MAIN_SERVER,
                                      data={'db id': db_id},
-                                     token=self.node_session_tokens[node_id])
+                                     token=self.node_session_tokens[MainDataDirectory().nodes[node_id][0].address[0]])
                 node_socket.send(sent_packet.encode())
             except socket.timeout:
                 confirm = False
@@ -584,16 +588,15 @@ class OrionMainServer:
         updated_items = {}  # final data to send client - {collection name: {updated item id: item data size}}
         uploaded_collection_hashes = uploaded_data_details['collection hashes']  # {collection name: collection hash}
         uploaded_item_ids = uploaded_data_details['db data']  # {collection name: {item id: item data size}}
-
         # start by checking if uploaded db already exists
         if db_id is None:
             # handle case: new DB
             updated_items = uploaded_data_details['db data']  # every item in new db is considered updated (new)
             # initialize MainDataDirectory() data
             db_id = MainDataDirectory().generate_db_id()
-            MainDataDirectory().accounts[account_id][1][uploaded_data_details['db name']] = db_id
-            MainDataDirectory().accounts[account_id][0].databases_owned['db name'] = db_id
-            MainDataDirectory().node_storage_data[db_id] = {}
+            db_name = uploaded_data_details['db name']
+            MainDataDirectory().accounts[account_id][1][db_name] = db_id
+            MainDataDirectory().accounts[account_id][0].databases_owned[db_name] = db_id
             MainDataDirectory().db_storage_division[db_id] = {}
         else:
             # compare current collection hashes to uploaded collection hashes and find collections with updated data
@@ -635,7 +638,8 @@ class OrionMainServer:
         client_socket.send(packet.encode())
 
         # get selected nodes from client
-        packet = Packet(request_encoded=client_socket.recv(receive_all_data=True))
+        packet_encoded = client_socket.recv()
+        packet = Packet(request_encoded=packet_encoded)
         if packet.token != token:
             self.handle_disconnect(client_socket, client_address, token)
             return
@@ -645,7 +649,7 @@ class OrionMainServer:
         nodes = MainDataDirectory().nodes  # {node id: (node data object, node socket)}
         for node_id in selected_nodes.keys():
             node_socket = nodes[node_id][1]
-            node_token = self.node_session_tokens[MainDataDirectory().nodes[node_id][0].address]
+            node_token = self.node_session_tokens[MainDataDirectory().nodes[node_id][0].address[0]]
             packet = Packet(request_type=PacketTypes.BE_READY_FOR_DATA, sender_type=NetworkMemberTypes.MAIN_SERVER,
                             data={'ip address': client_address[0], 'db id': db_id}, token=node_token)
             node_socket.send(packet.encode())
@@ -655,32 +659,35 @@ class OrionMainServer:
                         token=token)
         client_socket.send(packet.encode())
 
-        # get confirmation from client
-        packet = Packet(request_encoded=client_socket.recv())
-        confirmation = packet.data['answer']
-
-        # send client confirmation to nodes, if upload was not confirmed, nodes do not save data
-        for node_id in selected_nodes.keys():
-            node_socket = nodes[node_id][1]
-            node_token = self.node_session_tokens[MainDataDirectory().nodes[node_id][0].address]
-            packet = Packet(request_type=PacketTypes.DATA_UPLOAD_FINAL_RESPONSE,
-                            sender_type=NetworkMemberTypes.MAIN_SERVER,
-                            data={'answer': confirmation}, token=node_token)
-            node_socket.send(packet.encode())
-
-        # update data in MainDataDirectory() to match new upload (if upload is confirmed)
-        if not confirmation:
-            return
+        # # get confirmation from client
+        # packet_encoded = client_socket.recv()
+        # packet = Packet(request_encoded=packet_encoded)
+        # confirmation = packet.data['answer']
+        #
+        # # send client confirmation to nodes, if upload was not confirmed, nodes do not save data
+        # for node_id in selected_nodes.keys():
+        #     node_socket = nodes[node_id][1]
+        #     node_token = self.node_session_tokens[MainDataDirectory().nodes[node_id][0].address[0]]
+        #     packet = Packet(request_type=PacketTypes.DATA_UPLOAD_FINAL_RESPONSE,
+        #                     sender_type=NetworkMemberTypes.MAIN_SERVER,
+        #                     data={'answer': confirmation}, token=node_token)
+        #     node_socket.send(packet.encode())
+        #
+        # # update data in MainDataDirectory() to match new upload (if upload is confirmed)
+        # if not confirmation:
+        #     return
 
         # update MainDataDirectory() data
         # update 'database_data'
-        database_data = uploaded_data_details['db info']
+        database_data = uploaded_data_details['db data']
         MainDataDirectory().database_data[db_id] = database_data
         # update 'collection_hashes'
         MainDataDirectory().collection_hashes = uploaded_collection_hashes
         # update 'node_storage_data'
         current_node_storage_data = MainDataDirectory().node_storage_data  # {node id: {id of stored db: {name of stored collection: count of stored items}}}
         for node_id in selected_nodes.keys():
+            if db_id not in current_node_storage_data[node_id].keys():
+                current_node_storage_data[node_id][db_id] = {}
             node_db_data = current_node_storage_data[node_id][db_id]
             for col_name in updated_items.keys():
                 if col_name not in node_db_data.keys():
@@ -701,12 +708,14 @@ class OrionMainServer:
         MainDataDirectory().db_storage_division[db_id] = current_db_storage_division
         # update NodeData objects in MDD.nodes
         nodes = MainDataDirectory().nodes  # {node id: (node data object, node socket)}
+        # count size of new data
         new_data_counter = 0
         for col_name in updated_items.keys():  # {collection name: {updated item id: item data size}}
             for item_id, data_size in updated_items[col_name].items():
                 new_data_counter += data_size
-        for node_id, obj_and_socket in selected_nodes.items():
-            obj_and_socket[0].data_stored += new_data_counter
+        # add new data to node data object in MDD
+        for node_id in selected_nodes.keys():
+            nodes[node_id][0].data_stored += new_data_counter
         MainDataDirectory().nodes = nodes
 
     def handle_disconnect(self, client_socket, client_address, token, disconnect_completely=True):

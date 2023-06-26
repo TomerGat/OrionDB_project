@@ -19,6 +19,10 @@ have high chance of being relatively close to new client, as the average distanc
 
 
 def get_closest_available_nodes(client_address):
+    """
+    :param client_address: client address
+    :return: ids for nodes that are closest to client
+    """
     all_nodes = MainDataDirectory().nodes  # {node id: (node data object, node socket)}
     available_node_ids = MainDataDirectory().active_nodes  # list of active node ids
     available_nodes = {}  # should be - {node id: (node data object, node socket)}
@@ -31,7 +35,7 @@ def get_closest_available_nodes(client_address):
     return closest_nodes  # list of closest node ids
 
 
-def find_closest_storage_nodes_to_server(nodes):  # nodes format is identical to 'nodes' in MainDataDirectory()
+def find_closest_storage_nodes_to_server(nodes):  # nodes format is identical to 'nodes' in MainDataDirectory
     nodes_ttl = {}  # {node id: server to node ttl}
 
     # create dict of node ids to node ttl (geometric location radius)
@@ -50,7 +54,7 @@ def find_closest_storage_nodes_to_server(nodes):  # nodes format is identical to
     return highest_ttl
 
 
-def find_closest_storage_nodes_to_client(client_address, nodes):  # nodes format is identical to 'nodes' in MainDataDirectory()
+def find_closest_storage_nodes_to_client(client_address, nodes):  # nodes format is identical to 'nodes' in MainDataDirectory
     nodes_ttl = {}  # {node id: server to node ttl}
     client_ttl = calculate_ttl(client_address[0])
 
@@ -72,7 +76,11 @@ def find_closest_storage_nodes_to_client(client_address, nodes):  # nodes format
     return list(lowest_ttl_dif.keys())
 
 
-def find_nodes_with_database(db_id):
+def find_nodes_with_database(db_id):  # find combination of nodes that hold all data of a certain database
+    """
+    :param db_id: database id that I am searching for
+    :return: list of node ids that combine to hold all data in the database
+    """
     # get relevant data from main data director
     db_storage_division = MainDataDirectory().db_storage_division  # {db id: {collection name: {node id: [item ids]}}}
     node_storage_data = MainDataDirectory().node_storage_data  # {node id: {id of stored db: {name of stored collection: count of stored items}}}
@@ -91,7 +99,7 @@ def find_nodes_with_database(db_id):
     # Create a set to store the nodes that contain the database data
     nodes_with_db = set()
 
-    def dfs(db_id, collection_name, visited, items_to_find):
+    def dfs(db_id, collection_name, visited, items_to_find):  # depth-first search algorithm
         if db_id in visited and collection_name in visited[db_id]:
             return
         visited.setdefault(db_id, set()).add(collection_name)
@@ -100,6 +108,7 @@ def find_nodes_with_database(db_id):
             nodes_with_db.update(collections[collection_name].keys())
             for node_id in collections[collection_name]:
                 node_items = node_storage_data.get(node_id, {}).get(db_id, {}).get(collection_name, {})
+                node_items = {node_items} if isinstance(node_items, int) else node_items
                 if items_to_find.issubset(node_items):
                     dfs(db_id, collection_name, visited, items_to_find)
         else:
@@ -107,7 +116,7 @@ def find_nodes_with_database(db_id):
         visited[db_id].remove(collection_name)
 
     # Get the items in the given database
-    items_to_find = set(database_data.get(db_id, {}).values())
+    items_to_find = {item for sublist in database_data.get(db_id, {}).values() for item in sublist}
 
     # Perform a DFS starting from each collection in the given database
     collections = db_storage_division.get(db_id, {})

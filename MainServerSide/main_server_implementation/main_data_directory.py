@@ -1,7 +1,7 @@
 from hash import sha_function
 from data_structures import NodeData
 from util_functions import generate_random_number
-from final_values import MAX_AVAILABLE_TO_USED_STORAGE_RATIO, INITIAL_STORAGE_SPACE_TARGET
+from MainServerSide.final_values import MAX_AVAILABLE_TO_USED_STORAGE_RATIO, INITIAL_STORAGE_SPACE_TARGET
 
 
 class MainDataDirectory:
@@ -33,6 +33,7 @@ class MainDataDirectory:
         counter = 0
         for col in self.database_data[db_id].keys():
             counter += len(list(self.database_data[db_id][col].keys()))
+        return counter
 
     def remove_session_token(self, token_to_remove):
         self.active_session_tokens.remove(token_to_remove)
@@ -85,6 +86,7 @@ class MainDataDirectory:
         new_node_id = self.generate_node_id()
         self.nodes[new_node_id] = (new_node_data, node_socket)
         self.node_addresses[node_address[0]] = new_node_id
+        self.node_storage_data[new_node_id] = {}
 
     def add_account(self, account, connection_string):
         if connection_string in self.account_credentials.keys():
@@ -104,7 +106,7 @@ class MainDataDirectory:
 
     def generate_db_id(self):
         random_num = generate_random_number()
-        db_id = sha_function(random_num)
+        db_id = sha_function(str(random_num))
         if db_id not in self.existing_db_ids:
             self.existing_db_ids.add(db_id)
             return db_id

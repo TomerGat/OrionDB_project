@@ -6,6 +6,9 @@ from network_protocol_implementation.request_structure import Packet
 
 
 def initial_server_connect():
+    """
+    :return: true token (after exchange with server), socket (already connected to server)
+    """
     # create socket to connect to server
     server_socket = EncryptedSocket()
 
@@ -21,6 +24,12 @@ def initial_server_connect():
 
 
 def request_additional_storage_space(storage_space_size, node_id, confirmation_code):
+    """
+    :param storage_space_size: additional storage space allocation requested
+    :param node_id: node id that is requesting to allocate memory
+    :param confirmation_code: confirmation code from memory space allocation approval
+    :return: return confirmation
+    """
     server_socket, true_token = initial_server_connect()
 
     # send request
@@ -36,6 +45,10 @@ def request_additional_storage_space(storage_space_size, node_id, confirmation_c
 
 
 def get_node_approval(requested_storage_space):
+    """
+    :param requested_storage_space: storage space allocation requested
+    :return: approval (boolean), confirmation code
+    """
     server_socket, true_token = initial_server_connect()
 
     # send request
@@ -53,6 +66,13 @@ def get_node_approval(requested_storage_space):
 
 
 def open_node_account(username, password, storage_space, confirmation_code):
+    """
+    :param username: account username
+    :param password: account password
+    :param storage_space: requested storage space
+    :param confirmation_code: confirmation code (after requesting node approval)
+    :return: connection string to account if confirmed, else None is returned
+    """
     server_socket, true_token = initial_server_connect()
 
     # send request to open account
@@ -69,6 +89,11 @@ def open_node_account(username, password, storage_space, confirmation_code):
 
 
 def open_account(username, password):
+    """
+    :param username: account username
+    :param password: account password
+    :return: onnection string to account if confirmed, else None is returned
+    """
     server_socket, true_token = initial_server_connect()
 
     # send request to open account
